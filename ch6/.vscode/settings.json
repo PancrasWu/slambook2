@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "chrono": "cpp",
+        "iostream": "cpp",
+        "ostream": "cpp",
+        "cmath": "cpp",
+        "complex": "cpp"
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
+}

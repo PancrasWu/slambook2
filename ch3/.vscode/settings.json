@@ -1,3 +1,15 @@
 {
-    "C_Cpp.errorSquiggles": "Disabled"
+    "C_Cpp.errorSquiggles": "Disabled",
+    "files.associations": {
+        "iostream": "cpp",
+        "cholesky": "cpp",
+        "core": "cpp",
+        "eigenvalues": "cpp",
+        "geometry": "cpp",
+        "householder": "cpp",
+        "jacobi": "cpp",
+        "lu": "cpp",
+        "qr": "cpp",
+        "svd": "cpp"
+    }
 }

@@ -1,78 +1,100 @@
 #include <iostream>
 #include <chrono>
 #include <opencv2/opencv.hpp>
-#include <Eigen/Core>
-#include <Eigen/Dense>
-
 using namespace std;
-using namespace Eigen;
+using namespace cv;
 
-int main(int argc, char **argv) {
-  double ar = 1.0, br = 2.0, cr = 1.0;         // 真实参数值
-  double ae = 2.0, be = -1.0, ce = 5.0;        // 估计参数值
-  int N = 100;                                 // 数据点
-  double w_sigma = 1.0;                        // 噪声Sigma值
-  double inv_sigma = 1.0 / w_sigma;
-  cv::RNG rng;                                 // OpenCV随机数产生器
+const int N = 10; // 数据点数量
 
-  vector<double> x_data, y_data;      // 数据
-  for (int i = 0; i < N; i++) {
-    double x = i / 100.0;
-    x_data.push_back(x);
-    y_data.push_back(exp(ar * x * x + br * x + cr) + rng.gaussian(w_sigma * w_sigma));
-  }
+/*  函数声明  */
+void GN(double *, double *, double *);
+Mat jacobi(const Mat &, const Mat &);
+Mat yEstimate(const Mat &, const Mat &);
 
-  // 开始Gauss-Newton迭代
-  int iterations = 100;    // 迭代次数
-  double cost = 0, lastCost = 0;  // 本次迭代的cost和上一次迭代的cost
+int main(int argc, char **argv)
+{
+    double ar = 1.0, br = 2.0, cr = 1.0; // 真实参数值
+    double est[] = {2.0, 4.0, 0.0};       // 估计参数值
+    double w_sigma = 1.0;                 // 噪声Sigma值
+    cv::RNG rng;                          // OpenCV随机数产生器
 
-  chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
-  for (int iter = 0; iter < iterations; iter++) {
-
-    Matrix3d H = Matrix3d::Zero();             // Hessian = J^T W^{-1} J in Gauss-Newton
-    Vector3d b = Vector3d::Zero();             // bias
-    cost = 0;
-
-    for (int i = 0; i < N; i++) {
-      double xi = x_data[i], yi = y_data[i];  // 第i个数据点
-      double error = yi - exp(ae * xi * xi + be * xi + ce);
-      Vector3d J; // 雅可比矩阵
-      J[0] = -xi * xi * exp(ae * xi * xi + be * xi + ce);  // de/da
-      J[1] = -xi * exp(ae * xi * xi + be * xi + ce);  // de/db
-      J[2] = -exp(ae * xi * xi + be * xi + ce);  // de/dc
-
-      H += inv_sigma * inv_sigma * J * J.transpose();
-      b += -inv_sigma * inv_sigma * error * J;
-
-      cost += error * error;
+    double x_data[N], y_data[N]; // 生成真值数据
+    for (int i = 0; i < N; i++)
+    {
+        double x = i /5.0;
+        x_data[i] = x;
+        y_data[i] =  exp(ar * x * x +br * x + cr) + rng.gaussian(w_sigma * w_sigma);
     }
 
-    // 求解线性方程 Hx=b
-    Vector3d dx = H.ldlt().solve(b);
-    if (isnan(dx[0])) {
-      cout << "result is nan!" << endl;
-      break;
-    }
+    chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
+    GN(x_data, y_data, est);
+    chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
+    chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
 
-    if (iter > 0 && cost >= lastCost) {
-      cout << "cost: " << cost << ">= last cost: " << lastCost << ", break." << endl;
-      break;
-    }
-
-    ae += dx[0];
-    be += dx[1];
-    ce += dx[2];
-
-    lastCost = cost;
-
-    cout << "total cost: " << cost << ", \t\tupdate: " << dx.transpose() <<
-         "\t\testimated params: " << ae << "," << be << "," << ce << endl;
-  }
-
-  chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
-  chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
-  cout << "solve time cost = " << time_used.count() << " seconds. " << endl;
-
-  cout << "estimated abc = " << ae << ", " << be << ", " << ce << endl;
-  return 0;
+    cout << "solve time cost = " << time_used.count() << " seconds. " << endl;
+    return 0;
 }
+
+///高斯牛顿法
+void GN(double *x, double *y, double *est0)
+{
+    int iterations = 20;                                     // 迭代次数
+    double cost = 0, lastCost = 0;                           // 本次迭代的cost和上一次迭代的cost
+    Mat_<double> xM(1, N, x), yM(1, N, y), estM(3, 1, est0); //x矩阵，y矩阵，参数矩阵，
+    Mat_<double> jacobiM, estYM, errorM, bM, dxM;            //雅可比矩阵，评估值Y，误差矩阵，b值矩阵，deltaX矩阵
+    for (int iter = 0; iter < iterations; iter++)
+    {
+        jacobiM = jacobi(estM, xM);
+        cout<<"jacobiM is : "<< jacobiM.rows<<"__"<<jacobiM.cols<<endl;
+        estYM = yEstimate(estM, xM);
+        cout<<"estYM is : "<< estYM.rows<<"__"<<estYM.cols<<endl;
+        errorM = yM - estYM;                     // e
+        cost = errorM.dot(errorM);               // e^2
+        bM = -jacobiM * errorM.t();               // b
+        Mat_<double> HM = jacobiM * jacobiM.t(); // H
+        cout<<"HM is : "<< HM.rows<<"__"<<HM.cols<<endl;
+        cout<<"bM is : "<< bM.rows<<"__"<<bM.cols<<endl;
+        if (solve(HM, bM, dxM))                  // 求解Hx = b  
+        {
+            if (isnan(dxM.at<double>(0)))
+            {
+                cout << "result is nan!" << endl;
+                break;
+            }
+            if (iter > 0 && cost >= lastCost)
+            {
+                cout << "iteration: " << iter + 1 << ",cost: " << cost << ">= last cost: " << lastCost << ", break." << endl;
+                cout << "THe Value, x: " << estM.at<double>(0) << ",y:" << estM.at<double>(1) << ",c:" << estM.at<double>(2) << endl;
+                break;
+            }
+            estM = estM + dxM;
+            lastCost = cost;
+        }
+        else
+        {
+            cout << "can not solve the function ." << endl;
+        }
+    }
+}
+
+/// est：估计值，X：X值
+Mat jacobi(const Mat &est, const Mat &x)
+{
+    Mat_<double> J(est.rows,x.cols ), da, db, dc,A; //a,b,c的导数
+    exp(x.mul(est.at<double>(0,0)*x)+est.at<double>(1,0)*x + est.at<double>(2,0),A);
+    da = -x.mul( x.mul (A));
+    db = -x .mul( A);
+    dc = -A;
+    da.copyTo(J(Rect(0, 0, J.cols,1)));
+    db.copyTo(J(Rect(0, 1, J.cols,1)));
+    dc.copyTo(J(Rect(0, 2, J.cols,1)));
+    return J;
+}
+///计算 y = exp(ax^2+bx + c)
+Mat yEstimate(const Mat &est, const Mat &x)
+{
+    Mat_<double> Y(x.rows, x.cols);
+    exp(x.mul(est.at<double>(0,0)*x)+est.at<double>(1,0)*x + est.at<double>(2,0),Y);
+    return Y;
+}
+
