@@ -1,6 +1,6 @@
 include_directories("/usr/include/eigen3")
 add_executable(coordinateTransform coordinateTransform.cpp)
-
+add_definitions(-DPath ${CMAKE_CURRENT_SOURCE_DIR})
 find_package(Pangolin REQUIRED)
 include_directories(${Pangolin_INCLUDE_DIRS})
 add_executable(plotTrajectory plotTrajectory.cpp)

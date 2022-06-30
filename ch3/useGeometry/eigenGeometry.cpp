@@ -10,7 +10,7 @@ using namespace Eigen;
 
 // 本程序演示了 Eigen 几何模块的使用方法
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv){
 
   // Eigen/Geometry 模块提供了各种旋转和平移的表示
   // 3D 旋转矩阵直接使用 Matrix3d 或 Matrix3f
@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
   cout << "Transform matrix = \n" << T.matrix() << endl;
 
   // 用变换矩阵进行坐标变换
-  Vector3d v_transformed = T * v;                              // 相当于R*v+t
+   Vector3d v_transformed = T * v;                              // 相当于R*v+t
   cout << "v tranformed = " << v_transformed.transpose() << endl;
 
   // 对于仿射和射影变换，使用 Eigen::Affine3d 和 Eigen::Projective3d 即可，略
